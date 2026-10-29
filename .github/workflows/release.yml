@@ -16,7 +16,9 @@ on:
       - .upstream-versions
 
 concurrency:
-  group: universal-s-ui-release
+  # Dependency PRs may be created together in a newly migrated repository.
+  # Keep their validation separate so a PR can never cancel the main release.
+  group: universal-s-ui-${{ github.event_name == 'pull_request' && 'pr-validation' || 'release' }}
   cancel-in-progress: true
 
 env:
