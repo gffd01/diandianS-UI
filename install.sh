@@ -18,7 +18,7 @@ cur_dir=$(pwd)
 #   sudo ./install.sh             # auto (default)
 #   SUI_AUTO=0 sudo ./install.sh  # interactive
 SUI_AUTO="${SUI_AUTO:-1}"
-SUI_REPO="${SUI_REPO:-gffd01/diandian}"
+SUI_REPO="${SUI_REPO:-gffd01/diandianS-UI}"
 SUI_ACCESS_MODE="${SUI_ACCESS_MODE:-direct}"
 SUI_API_TOKEN_DAYS="${SUI_API_TOKEN_DAYS:-30}"
 SUI_NODE_PORTS="${SUI_NODE_PORTS:-}"

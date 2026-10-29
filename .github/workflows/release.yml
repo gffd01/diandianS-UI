@@ -7,11 +7,10 @@ on:
   workflow_dispatch:
   pull_request:
     branches:
-      - universal-installer-v2
+      - main
   push:
     branches:
       - main
-      - universal-installer-v2
     paths-ignore:
       - README.md
       - .upstream-versions

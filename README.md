@@ -7,7 +7,8 @@
 Debian、Ubuntu、CentOS、Rocky Linux、AlmaLinux、Fedora、Arch Linux 和 openSUSE VPS。
 服务器上具体建立什么节点、是否组成多级网络，由使用者在 S-UI 后台配置，安装器不预设线路。
 
-旧版代码仍保留在 `main`，本版开发位于 `universal-installer-v2`，两者互不覆盖。
+本仓库是 `gffd01/diandian` 中已验证优化版的独立正式仓库，稳定源码位于 `main`。
+原仓库继续保留作为迁移前历史记录，本仓库的安装包和发布流程不再依赖原仓库。
 
 ## 这一版解决什么
 
@@ -26,19 +27,14 @@ Debian、Ubuntu、CentOS、Rocky Linux、AlmaLinux、Fedora、Arch Linux 和 ope
 
 请用 `root` 用户复制整行执行：
 
-```bash
-curl --fail --location --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/gffd01/diandian/43a654f7aa76cbfec7e53c8d1f0d5c07f7697f62/install.sh -o /tmp/s-ui-universal-install.sh && echo '82e21170a1e9bc190cc71fc9345712c30cb7f21c422fe2f2678371be876d3d29  /tmp/s-ui-universal-install.sh' | sha256sum --check - && chmod 700 /tmp/s-ui-universal-install.sh && SUI_AUTO=1 /tmp/s-ui-universal-install.sh universal-23
-```
-
-这条命令同时固定了安装脚本提交、脚本 SHA-256 和 Release 标签。只有出现
-`/tmp/s-ui-universal-install.sh: OK` 才会继续安装。`universal-23` 的 7 种架构均已完成
-GitHub Actions 构建，发布包也包含独立的 `SHA256SUMS`。
+正式的一键安装命令会在本仓库首次 Linux 全架构 Release 完成后固定到对应提交和标签。
+安装脚本、Release 和 `SHA256SUMS` 都只从 `gffd01/diandianS-UI` 获取。
 
 需要先审查源码，可克隆新分支：
 
 ```bash
-git clone --depth=1 --branch universal-installer-v2 --single-branch https://github.com/gffd01/diandian.git
-cd diandian
+git clone --depth=1 --branch main --single-branch https://github.com/gffd01/diandianS-UI.git
+cd diandianS-UI
 less install.sh
 ```
 
@@ -69,8 +65,9 @@ SUI_NODE_PORTS=443,8443 sudo ./install.sh
 服务稳定性、TCP 参数和可观测诊断做好；线路本身的问题必须用分段测速和丢包数据判断。
 
 后台的“出站列表”可以分别测量每个出站的延迟和下载吞吐量；“中转管理”可以同时测试中转
-出站与 `direct` 出站，帮助判断瓶颈是在 VPS 本身还是中转线路。一次吞吐量测试最多下载 5 MiB，
-不会在批量延迟检测时自动消耗测速流量。Hysteria、Brutal 和 TUIC 仍保留兼容默认值，界面会在
+出站与 `direct` 出站，帮助判断瓶颈是在 VPS 本身还是中转线路。“全部测速”会动态读取当前全部
+落地节点，最多并发 3 个，每个节点下载 5 MiB 真实数据并显示进度、延迟、速度和失败原因。
+Hysteria、Brutal 和 TUIC 仍保留兼容默认值，界面会在
 默认带宽或拥塞算法可能不适合实际线路时提示用户，不会在缺少线路证据时擅自改写配置。
 
 ## 源码构建

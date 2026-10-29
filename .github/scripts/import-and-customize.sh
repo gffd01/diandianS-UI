@@ -100,9 +100,9 @@ replace_once(
 installer = root / "install.sh"
 install_text = installer.read_text(encoding="utf-8")
 replacements = {
-    "https://raw.githubusercontent.com/Teminuosi/s-ui/": "https://raw.githubusercontent.com/gffd01/diandian/",
-    "https://api.github.com/repos/Teminuosi/s-ui/releases": "https://api.github.com/repos/gffd01/diandian/releases",
-    "https://github.com/Teminuosi/s-ui/releases/download": "https://github.com/gffd01/diandian/releases/download",
+    "https://raw.githubusercontent.com/Teminuosi/s-ui/": "https://raw.githubusercontent.com/gffd01/diandianS-UI/",
+    "https://api.github.com/repos/Teminuosi/s-ui/releases": "https://api.github.com/repos/gffd01/diandianS-UI/releases",
+    "https://github.com/Teminuosi/s-ui/releases/download": "https://github.com/gffd01/diandianS-UI/releases/download",
 }
 for old, new in replacements.items():
     if old not in install_text:

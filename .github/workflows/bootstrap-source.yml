@@ -6,12 +6,6 @@ permissions:
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/bootstrap-source.yml
-      - .github/scripts/import-and-customize.sh
 
 concurrency:
   group: import-clean-source
@@ -19,7 +13,7 @@ concurrency:
 
 jobs:
   import-source:
-    if: github.repository == 'gffd01/diandian'
+    if: github.repository == 'gffd01/diandianS-UI'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
