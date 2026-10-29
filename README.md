@@ -27,8 +27,14 @@ Debian、Ubuntu、CentOS、Rocky Linux、AlmaLinux、Fedora、Arch Linux 和 ope
 
 请用 `root` 用户复制整行执行：
 
-正式的一键安装命令会在本仓库首次 Linux 全架构 Release 完成后固定到对应提交和标签。
-安装脚本、Release 和 `SHA256SUMS` 都只从 `gffd01/diandianS-UI` 获取。
+```bash
+curl --fail --location --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/gffd01/diandianS-UI/012c0c7ead3097e0be15c77de5f16ef969b81c4c/install.sh -o /tmp/s-ui-universal-install.sh && echo '99b662aae59c585c511bb73a51770383c972c1855c2ef4455976b1a7dbced0d6  /tmp/s-ui-universal-install.sh' | sha256sum --check - && chmod 700 /tmp/s-ui-universal-install.sh && SUI_AUTO=1 /tmp/s-ui-universal-install.sh universal-12
+```
+
+这条命令同时固定了新仓库的安装脚本提交、脚本 SHA-256 和 Release 标签。只有出现
+`/tmp/s-ui-universal-install.sh: OK` 才会继续安装。`universal-12` 的 7 种 Linux 架构均已通过
+GitHub Actions 构建，发布包包含独立的 `SHA256SUMS`，所有下载只来自
+`gffd01/diandianS-UI`。
 
 需要先审查源码，可克隆新分支：
 
