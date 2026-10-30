@@ -399,15 +399,15 @@ show_status() {
     check_status $1
     case $? in
     0)
-        echo -e "${1} state: ${green}Running${plain}"
+        echo -e "${1} 状态：${green}运行中${plain}"
         show_enable_status $1
         ;;
     1)
-        echo -e "${1} state: ${yellow}Not Running${plain}"
+        echo -e "${1} 状态：${yellow}未运行${plain}"
         show_enable_status $1
         ;;
     2)
-        echo -e "${1} state: ${red}Not Installed${plain}"
+        echo -e "${1} 状态：${red}未安装${plain}"
         ;;
     esac
 }
@@ -415,9 +415,9 @@ show_status() {
 show_enable_status() {
     check_enabled $1
     if [[ $? == 0 ]]; then
-        echo -e "Start ${1} automatically: ${green}Yes${plain}"
+        echo -e "${1} 开机自启：${green}是${plain}"
     else
-        echo -e "Start ${1} automatically: ${red}No${plain}"
+        echo -e "${1} 开机自启：${red}否${plain}"
     fi
 }
 
@@ -433,17 +433,17 @@ check_s-ui_status() {
 show_s-ui_status() {
     check_s-ui_status
     if [[ $? == 0 ]]; then
-        echo -e "s-ui state: ${green}Running${plain}"
+        echo -e "s-ui 状态：${green}运行中${plain}"
     else
-        echo -e "s-ui state: ${red}Not Running${plain}"
+        echo -e "s-ui 状态：${red}未运行${plain}"
     fi
 }
 
 bbr_menu() {
-    echo -e "${green}\t1.${plain} Enable BBR"
-    echo -e "${green}\t2.${plain} Disable BBR"
-    echo -e "${green}\t0.${plain} Back to Main Menu"
-    read -p "Choose an option: " choice
+    echo -e "${green}\t1.${plain} 开启 BBR"
+    echo -e "${green}\t2.${plain} 关闭 BBR"
+    echo -e "${green}\t0.${plain} 返回主菜单"
+    read -p "请输入选项：" choice
     case "$choice" in
     0)
         show_menu
@@ -454,14 +454,14 @@ bbr_menu() {
     2)
         disable_bbr
         ;;
-    *) echo "Invalid choice" ;;
+    *) echo "无效选项" ;;
     esac
 }
 
 disable_bbr() {
     local tuning_file="/etc/sysctl.d/99-s-ui-network.conf"
     if [[ ! -f "$tuning_file" ]] || ! grep -Eq '^net\.ipv4\.tcp_congestion_control[[:space:]]*=[[:space:]]*bbr$' "$tuning_file"; then
-        echo -e "${yellow}BBR is not currently enabled.${plain}"
+        echo -e "${yellow}BBR 当前未开启。${plain}"
         return 0
     fi
     sed -i \
@@ -473,21 +473,21 @@ disable_bbr() {
         'net.ipv4.tcp_congestion_control = cubic' >> "$tuning_file"
     sysctl --system >/dev/null 2>&1 || true
     if [[ $(sysctl net.ipv4.tcp_congestion_control | awk '{print $3}') == "cubic" ]]; then
-        echo -e "${green}BBR has been replaced with CUBIC successfully.${plain}"
+        echo -e "${green}已关闭 BBR，并成功切换为 CUBIC。${plain}"
     else
-        echo -e "${red}Failed to replace BBR with CUBIC. Please check your system configuration.${plain}"
+        echo -e "${red}关闭 BBR 失败，请检查系统配置。${plain}"
     fi
 }
 
 enable_bbr() {
     local tuning_file="/etc/sysctl.d/99-s-ui-network.conf"
     if [[ -f "$tuning_file" ]] && grep -Eq '^net\.ipv4\.tcp_congestion_control[[:space:]]*=[[:space:]]*bbr$' "$tuning_file"; then
-        echo -e "${green}BBR is already enabled!${plain}"
+        echo -e "${green}BBR 已经开启。${plain}"
         return 0
     fi
     if ! modprobe tcp_bbr >/dev/null 2>&1 \
         || ! sysctl -n net.ipv4.tcp_available_congestion_control 2>/dev/null | grep -qw bbr; then
-        echo -e "${red}This kernel does not provide BBR. No system settings were changed.${plain}"
+        echo -e "${red}当前内核不支持 BBR，未修改任何系统设置。${plain}"
         return 1
     fi
     mkdir -p /etc/sysctl.d
@@ -501,9 +501,9 @@ enable_bbr() {
         'net.ipv4.tcp_congestion_control = bbr' >> "$tuning_file"
     sysctl --system >/dev/null 2>&1 || true
     if [[ $(sysctl net.ipv4.tcp_congestion_control | awk '{print $3}') == "bbr" ]]; then
-        echo -e "${green}BBR has been enabled successfully.${plain}"
+        echo -e "${green}BBR 已成功开启。${plain}"
     else
-        echo -e "${red}Failed to enable BBR. Please check your system configuration.${plain}"
+        echo -e "${red}开启 BBR 失败，请检查系统配置。${plain}"
     fi
 }
 
@@ -840,41 +840,41 @@ show_usage() {
 
 show_menu() {
   echo -e "
-  ${green}S-UI Admin Management Script ${plain}
+  ${green}S-UI 管理脚本${plain}
 ————————————————————————————————
-  ${green}0.${plain} Exit
+  ${green}0.${plain} 退出
 ————————————————————————————————
-  ${green}1.${plain} Install
-  ${green}2.${plain} Update
-  ${green}3.${plain} Custom Version
-  ${green}4.${plain} Uninstall
+  ${green}1.${plain} 安装 S-UI
+  ${green}2.${plain} 更新 S-UI
+  ${green}3.${plain} 安装指定版本
+  ${green}4.${plain} 卸载 S-UI
 ————————————————————————————————
-  ${green}5.${plain} Reset admin credentials to default
-  ${green}6.${plain} Set admin credentials
-  ${green}7.${plain} View admin credentials
+  ${green}5.${plain} 重置管理员账号密码为默认值
+  ${green}6.${plain} 设置管理员账号密码
+  ${green}7.${plain} 查看管理员账号密码
 ————————————————————————————————
-  ${green}8.${plain} Reset Panel Settings
-  ${green}9.${plain} Set Panel settings
-  ${green}10.${plain} View Panel Settings
+  ${green}8.${plain} 重置面板设置
+  ${green}9.${plain} 设置面板参数
+  ${green}10.${plain} 查看面板设置
 ————————————————————————————————
-  ${green}11.${plain} S-UI Start
-  ${green}12.${plain} S-UI Stop
-  ${green}13.${plain} S-UI Restart
-  ${green}14.${plain} S-UI Check State
-  ${green}15.${plain} S-UI Check Logs
-  ${green}16.${plain} S-UI Enable Autostart
-  ${green}17.${plain} S-UI Disable Autostart
+  ${green}11.${plain} 启动 S-UI
+  ${green}12.${plain} 停止 S-UI
+  ${green}13.${plain} 重启 S-UI
+  ${green}14.${plain} 查看 S-UI 运行状态
+  ${green}15.${plain} 查看 S-UI 日志
+  ${green}16.${plain} 开启 S-UI 开机自启
+  ${green}17.${plain} 关闭 S-UI 开机自启
 ————————————————————————————————
-  ${green}18.${plain} Enable or Disable BBR
-  ${green}19.${plain} SSL Certificate Management
-  ${green}20.${plain} Cloudflare SSL Certificate
+  ${green}18.${plain} BBR 加速管理
+  ${green}19.${plain} SSL 证书管理
+  ${green}20.${plain} Cloudflare SSL 证书
 ————————————————————————————————
-  ${green}21.${plain} Create time-limited API token
-  ${green}22.${plain} Update Menu Script
+  ${green}21.${plain} 创建限时 API 令牌
+  ${green}22.${plain} 更新管理脚本
 ————————————————————————————————
  "
     show_status s-ui
-    echo && read -p "Please enter your selection [0-22]: " num
+    echo && read -p "请输入选项 [0-22]：" num
 
     case "${num}" in
     0)

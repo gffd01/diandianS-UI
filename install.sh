@@ -286,9 +286,9 @@ EOF
     fi
 
     if sysctl --system >/dev/null 2>&1; then
-        echo -e "${green}[tuning] Applied memory-aware TCP and connection settings.${plain}"
+        echo -e "${green}[系统优化] 已根据内存配置 TCP 和连接参数。${plain}"
     else
-        echo -e "${yellow}[tuning] Some kernel settings were unavailable; installation will continue with supported values.${plain}"
+        echo -e "${yellow}[系统优化] 部分内核参数不可用，将使用系统支持的参数继续安装。${plain}"
     fi
 }
 
@@ -352,16 +352,19 @@ config_after_install() {
         fi
 
         echo -e "###############################################################"
-        echo -e "${green}NEW ADMIN USERNAME: ${INSTALL_ADMIN_USER}${plain}"
-        echo -e "${green}NEW ADMIN PASSWORD: ${INSTALL_ADMIN_PASS}${plain}"
-        echo -e "${green}PANEL PORT: ${INSTALL_PANEL_PORT}${plain}"
-        echo -e "${green}PANEL PATH: ${INSTALL_PANEL_PATH}${plain}"
-        echo -e "${green}SUBSCRIPTION PORT: ${current_sub_port}${plain}"
-        echo -e "${green}ACCESS MODE: ${SUI_ACCESS_MODE}${plain}"
+        local access_mode_text="${SUI_ACCESS_MODE}"
+        [[ "${SUI_ACCESS_MODE}" == "direct" ]] && access_mode_text="直连"
+        [[ "${SUI_ACCESS_MODE}" == "tunnel" ]] && access_mode_text="SSH 隧道"
+        echo -e "${green}新的管理员用户名：${INSTALL_ADMIN_USER}${plain}"
+        echo -e "${green}新的管理员密码：${INSTALL_ADMIN_PASS}${plain}"
+        echo -e "${green}面板端口：${INSTALL_PANEL_PORT}${plain}"
+        echo -e "${green}面板路径：${INSTALL_PANEL_PATH}${plain}"
+        echo -e "${green}订阅端口：${current_sub_port}${plain}"
+        echo -e "${green}访问模式：${access_mode_text}${plain}"
         if [[ -n "$config_token" ]]; then
-            echo -e "${green}API TOKEN (${SUI_API_TOKEN_DAYS} days): ${config_token}${plain}"
+            echo -e "${green}API 令牌（有效期 ${SUI_API_TOKEN_DAYS} 天）：${config_token}${plain}"
         fi
-        echo -e "${yellow}Save these credentials now. A later automatic upgrade will rotate them again.${plain}"
+        echo -e "${yellow}请立即保存以上登录信息，后续自动升级可能会再次更换这些凭据。${plain}"
         echo -e "###############################################################"
         return
     fi
@@ -478,7 +481,7 @@ open_firewall() {
 # local and works regardless of country, provider, public IP or server role.
 verify_panel_login() {
     if ! systemctl is-active --quiet s-ui; then
-        echo -e "${red}[verify] s-ui service is not active.${plain}"
+        echo -e "${red}[安装验证] S-UI 服务未运行。${plain}"
         systemctl status s-ui --no-pager -l || true
         journalctl -u s-ui -n 60 --no-pager || true
         return 1
@@ -490,7 +493,7 @@ verify_panel_login() {
     panel_port=$(printf '%s\n' "$settings" | sed -n 's/.*Panel port:[[:space:]]*//p' | head -1)
     panel_path=$(printf '%s\n' "$settings" | sed -n 's/.*Panel path:[[:space:]]*//p' | head -1)
     [[ "$panel_port" =~ ^[0-9]{1,5}$ ]] || {
-        echo -e "${red}[verify] Could not read a valid panel port.${plain}"
+        echo -e "${red}[安装验证] 无法读取有效的面板端口。${plain}"
         return 1
     }
     [[ -n "$panel_path" ]] || panel_path="/"
@@ -498,7 +501,7 @@ verify_panel_login() {
     [[ "$panel_path" == */ ]] || panel_path="${panel_path}/"
 
     if is_auto && [[ -z "$INSTALL_ADMIN_USER" || -z "$INSTALL_ADMIN_PASS" ]]; then
-        echo -e "${red}[verify] Generated credentials are missing; refusing to report success.${plain}"
+        echo -e "${red}[安装验证] 未找到生成的登录凭据，不能将安装标记为成功。${plain}"
         return 1
     fi
 
@@ -528,15 +531,15 @@ verify_panel_login() {
             fi
 
             rm -f "$auth_file" "$cookie_file"
-            echo -e "${green}[verify] Login page, generated credentials and authenticated panel all passed.${plain}"
-            echo -e "${green}[verify] Local panel check: ${base_url}${plain}"
+            echo -e "${green}[安装验证] 登录页面、生成的账号密码及面板认证均已通过。${plain}"
+            echo -e "${green}[安装验证] 本地面板检查通过：${base_url}${plain}"
             return 0
         done
         sleep 1
     done
 
     rm -f "$auth_file" "$cookie_file"
-    echo -e "${red}[verify] Panel or generated credentials failed verification. Installation is NOT marked successful.${plain}"
+    echo -e "${red}[安装验证] 面板或生成的登录凭据验证失败，本次安装不能标记为成功。${plain}"
     systemctl status s-ui --no-pager -l || true
     journalctl -u s-ui -n 60 --no-pager || true
     return 1
@@ -551,9 +554,9 @@ post_install_diagnostics() {
     load=$(awk '{print $1 "," $2 "," $3}' /proc/loadavg 2>/dev/null || true)
     root_free=$(df -h / 2>/dev/null | awk 'NR==2 {print $4}' || true)
     mtu=$(ip -o link show 2>/dev/null | awk '$2 != "lo:" {for (i=1;i<=NF;i++) if ($i=="mtu") {print $(i+1); exit}}' || true)
-    echo -e "${green}[diagnostics] service=active congestion=${congestion} qdisc=${qdisc} mtu=${mtu:-unknown}${plain}"
-    echo -e "${green}[diagnostics] memory=${memory:-unknown} load=${load:-unknown} root_free=${root_free:-unknown}${plain}"
-    echo -e "${yellow}[diagnostics] These confirm host readiness; route bandwidth and packet loss depend on the provider and path.${plain}"
+    echo -e "${green}[系统诊断] 服务=运行中 拥塞控制=${congestion} 队列算法=${qdisc} MTU=${mtu:-未知}${plain}"
+    echo -e "${green}[系统诊断] 内存=${memory:-未知} 负载=${load:-未知} 根目录剩余空间=${root_free:-未知}${plain}"
+    echo -e "${yellow}[网络诊断] 以上结果仅确认服务器已就绪；线路带宽和丢包取决于服务商及网络路径。${plain}"
 }
 
 prepare_services() {
@@ -672,15 +675,15 @@ install_s-ui() {
     verify_panel_login
     post_install_diagnostics
 
-    echo -e "${green}s-ui ${last_version}${plain} installation finished, it is up and running now..."
-    echo -e "You may access the Panel with following URL(s):${green}"
+    echo -e "${green}S-UI ${last_version}${plain} 安装完成，当前已启动并正常运行。"
+    echo -e "你可以通过以下地址访问面板：${green}"
     /usr/local/s-ui/sui uri
     echo -e "${plain}"
     echo -e ""
     s-ui help
 }
 
-echo -e "${green}Executing...${plain}"
+echo -e "${green}正在执行，请稍候……${plain}"
 install_base
 if (( $# > 0 )); then
     install_s-ui "$1"

@@ -213,7 +213,7 @@ func getPanelURI() {
 		fmt.Println(Proto + Listen + PortText + BasePath)
 		return
 	}
-	fmt.Println("Local address:")
+	fmt.Println("访问地址：")
 	netInterfaces, _ := gopsutilnet.Interfaces()
 	for i := 0; i < len(netInterfaces); i++ {
 		if len(netInterfaces[i].Flags) > 2 && netInterfaces[i].Flags[0] == "up" && netInterfaces[i].Flags[1] != "loopback" {
