@@ -1,22 +1,25 @@
 package realitytarget
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"net/netip"
 	"reflect"
 	"testing"
 )
 
-func TestNormalizeDomains(t *testing.T) {
-	got := normalizeDomains([]string{
-		" WWW.Apple.COM. ", "www.apple.com", "192.0.2.1",
-		"bad_name.example", "valid.example", "-bad.example",
-	}, 10)
-	want := []string{"www.apple.com", "valid.example"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("normalizeDomains() = %#v, want %#v", got, want)
+func TestBuiltInDomainsAreValidAndUnique(t *testing.T) {
+	if len(BuiltInDomains) < 50 {
+		t.Fatalf("built-in candidate pool is unexpectedly small: %d", len(BuiltInDomains))
+	}
+	seen := make(map[string]struct{}, len(BuiltInDomains))
+	for _, domain := range BuiltInDomains {
+		if !validHostname(domain) {
+			t.Errorf("invalid built-in domain: %q", domain)
+		}
+		if _, exists := seen[domain]; exists {
+			t.Errorf("duplicate built-in domain: %q", domain)
+		}
+		seen[domain] = struct{}{}
 	}
 }
 
@@ -47,30 +50,6 @@ func TestSelectBatchIsStableAndChanges(t *testing.T) {
 	}
 	if !reflect.DeepEqual(domains, []string{"a.example", "b.example", "c.example", "d.example"}) {
 		t.Fatalf("input was modified: %#v", domains)
-	}
-}
-
-func TestFetchFeedValidatesAndDeduplicates(t *testing.T) {
-	payload, err := json.Marshal(Feed{
-		Version: 1, GeneratedAt: "2026-11-02T00:00:00Z",
-		Domains: []string{"WWW.Apple.com", "www.apple.com", "127.0.0.1", "valid.example"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	feed, err := decodeFeed(payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{"www.apple.com", "valid.example"}
-	if !reflect.DeepEqual(feed.Domains, want) {
-		t.Fatalf("domains = %#v, want %#v", feed.Domains, want)
-	}
-}
-
-func TestFetchFeedRejectsOversize(t *testing.T) {
-	if _, err := decodeFeed(bytes.Repeat([]byte("x"), maxFeedBytes+1)); err == nil {
-		t.Fatal("expected oversized feed to fail")
 	}
 }
 

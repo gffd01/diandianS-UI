@@ -1,4 +1,4 @@
-// Package realitytarget fetches and tests public REALITY handshake candidates.
+// Package realitytarget tests the built-in REALITY handshake candidates from the current VPS.
 package realitytarget
 
 import (
@@ -6,12 +6,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"net/netip"
 	"sort"
 	"strings"
@@ -19,19 +15,25 @@ import (
 	"time"
 )
 
-const maxFeedBytes = 256 * 1024
-
 var BuiltInDomains = []string{
 	"www.apple.com", "addons.mozilla.org", "www.amazon.com", "aws.amazon.com",
 	"www.cloudflare.com", "www.microsoft.com", "visualstudio.microsoft.com",
 	"www.samsung.com", "www.nvidia.com", "www.amd.com", "www.intel.com",
 	"www.sony.com", "dl.google.com", "r.bing.com", "th.bing.com",
-}
-
-type Feed struct {
-	Version     int      `json:"version"`
-	GeneratedAt string   `json:"generated_at"`
-	Domains     []string `json:"domains"`
+	"store-images.s-microsoft.com", "cdn.userway.org", "tag.demandbase.com",
+	"consent.trustarc.com", "rum.hlx.page", "www.adobe.com", "www.cisco.com",
+	"www.dell.com", "www.facebook.com", "www.google.com", "www.hp.com",
+	"www.ibm.com", "www.instagram.com", "www.lenovo.com", "www.linkedin.com",
+	"www.netflix.com", "www.oracle.com", "www.paypal.com", "www.reddit.com",
+	"www.spotify.com", "www.tiktok.com", "www.wikipedia.org", "www.yahoo.com",
+	"www.youtube.com", "www.bing.com", "ibm.com", "facebook.com",
+	"static.gc.apple.com", "reddit.com", "support.mozilla.org", "google.com",
+	"spotify.com", "hp.com", "cloudflare.com", "netflix.com", "wikipedia.org",
+	"intel.com", "amd.com", "icloud.com", "tiktok.com", "paypal.com",
+	"mozilla.org", "linkedin.com", "learn.microsoft.com", "support.google.com",
+	"docs.google.com", "yahoo.com", "docs.oracle.com", "cloud.google.com",
+	"gstatic.com", "www.icloud.com", "adobe.com", "www.gstatic.com",
+	"googleapis.com", "youtube.com", "windows.com", "www.googleapis.com",
 }
 
 type Result struct {
@@ -50,70 +52,6 @@ var blockedAddressRanges = []netip.Prefix{
 	netip.MustParsePrefix("198.18.0.0/15"), netip.MustParsePrefix("198.51.100.0/24"),
 	netip.MustParsePrefix("203.0.113.0/24"), netip.MustParsePrefix("240.0.0.0/4"),
 	netip.MustParsePrefix("2001:db8::/32"),
-}
-
-func FetchFeed(ctx context.Context, feedURL string) (Feed, error) {
-	var feed Feed
-	client := &http.Client{
-		Timeout:       5 * time.Second,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
-	if err != nil {
-		return feed, err
-	}
-	req.Header.Set("User-Agent", "diandianS-UI-reality-targets/1")
-	resp, err := client.Do(req)
-	if err != nil {
-		return feed, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return feed, fmt.Errorf("candidate feed returned HTTP %d", resp.StatusCode)
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxFeedBytes+1))
-	if err != nil {
-		return feed, err
-	}
-	return decodeFeed(body)
-}
-
-func decodeFeed(body []byte) (Feed, error) {
-	var feed Feed
-	if len(body) > maxFeedBytes {
-		return feed, errors.New("candidate feed is too large")
-	}
-	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&feed); err != nil {
-		return feed, err
-	}
-	if feed.Version != 1 {
-		return feed, fmt.Errorf("unsupported candidate feed version: %d", feed.Version)
-	}
-	feed.Domains = normalizeDomains(feed.Domains, 500)
-	if len(feed.Domains) == 0 {
-		return feed, errors.New("candidate feed has no valid domains")
-	}
-	return feed, nil
-}
-
-func normalizeDomains(domains []string, limit int) []string {
-	seen := make(map[string]struct{}, len(domains))
-	result := make([]string, 0, len(domains))
-	for _, raw := range domains {
-		domain := strings.ToLower(strings.TrimSpace(strings.TrimSuffix(raw, ".")))
-		if !validHostname(domain) {
-			continue
-		}
-		if _, exists := seen[domain]; exists {
-			continue
-		}
-		seen[domain] = struct{}{}
-		result = append(result, domain)
-		if limit > 0 && len(result) >= limit {
-			break
-		}
-	}
-	return result
 }
 
 func validHostname(domain string) bool {

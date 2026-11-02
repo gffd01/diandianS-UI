@@ -72,14 +72,6 @@
                     {{ targetSourceText }}
                   </v-chip>
                 </div>
-                <v-alert
-                  v-if="targetFallback"
-                  class="mt-3"
-                  density="compact"
-                  type="warning"
-                  variant="tonal">
-                  {{ $t('quickTemplate.targetFallback') }}
-                </v-alert>
                 <v-card v-if="targetResults.length" class="mt-3" variant="outlined">
                   <v-card-text class="py-2 text-caption">
                     {{ $t('quickTemplate.targetResultHint', { tested: targetTested }) }}
@@ -147,7 +139,6 @@ export default {
       targetLoading: false,
       targetResults: [] as any[],
       targetSource: '',
-      targetFallback: false,
       targetTested: 0,
       selected: 'all',
       form: {
@@ -223,8 +214,7 @@ export default {
       return this.selected === 'all' || this.selected === 'vless-reality'
     },
     targetSourceText(): string {
-      const source = ['public', 'cache', 'builtin'].includes(this.targetSource) ? this.targetSource : 'builtin'
-      return i18n.global.t('quickTemplate.targetSource.' + source)
+      return i18n.global.t('quickTemplate.targetSource.local')
     },
   },
   methods: {
@@ -239,7 +229,6 @@ export default {
       this.targetLoading = false
       this.targetResults = []
       this.targetSource = ''
-      this.targetFallback = false
       this.targetTested = 0
     },
     closeModal() {
@@ -254,8 +243,7 @@ export default {
           push.error({ message: i18n.global.t('quickTemplate.targetScanFail') + (msg.msg ? ': ' + msg.msg : '') })
           return
         }
-        this.targetSource = msg.obj.source || 'builtin'
-        this.targetFallback = !!msg.obj.fallback
+        this.targetSource = msg.obj.source || 'local'
         this.targetTested = Number(msg.obj.tested || 0)
         this.targetResults = Array.isArray(msg.obj.results) ? msg.obj.results : []
         if (this.targetResults.length === 0) {
