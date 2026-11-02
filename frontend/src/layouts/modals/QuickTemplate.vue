@@ -56,6 +56,62 @@
                 :items="sniPresets"
                 v-model="form.sni">
               </v-combobox>
+              <template v-if="canScanRealityTargets">
+                <div class="d-flex align-center flex-wrap ga-2 mt-3">
+                  <v-btn
+                    color="primary"
+                    variant="tonal"
+                    size="small"
+                    prepend-icon="mdi-radar"
+                    :loading="targetLoading"
+                    :disabled="loading"
+                    @click="scanRealityTargets">
+                    {{ $t(targetResults.length ? 'quickTemplate.targetNextBatch' : 'quickTemplate.targetScan') }}
+                  </v-btn>
+                  <v-chip v-if="targetSource" size="small" variant="outlined">
+                    {{ targetSourceText }}
+                  </v-chip>
+                </div>
+                <v-alert
+                  v-if="targetFallback"
+                  class="mt-3"
+                  density="compact"
+                  type="warning"
+                  variant="tonal">
+                  {{ $t('quickTemplate.targetFallback') }}
+                </v-alert>
+                <v-card v-if="targetResults.length" class="mt-3" variant="outlined">
+                  <v-card-text class="py-2 text-caption">
+                    {{ $t('quickTemplate.targetResultHint', { tested: targetTested }) }}
+                  </v-card-text>
+                  <v-divider></v-divider>
+                  <v-list density="compact" max-height="260" class="overflow-y-auto">
+                    <v-list-item
+                      v-for="item in targetResults"
+                      :key="item.domain"
+                      :active="form.sni === item.domain"
+                      color="primary"
+                      @click="selectRealityTarget(item.domain)">
+                      <template #title>
+                        <span class="font-weight-medium">{{ item.domain }}</span>
+                      </template>
+                      <template #subtitle>
+                        {{ $t('quickTemplate.targetMetrics', {
+                          successes: item.successes,
+                          attempts: item.attempts,
+                          latency: item.median_ms,
+                          jitter: item.jitter_ms,
+                        }) }}
+                      </template>
+                      <template #append>
+                        <v-btn size="small" variant="text" color="primary">
+                          {{ $t('quickTemplate.targetUse') }}
+                        </v-btn>
+                      </template>
+                    </v-list-item>
+                  </v-list>
+                </v-card>
+              </template>
             </v-col>
           </v-row>
         </v-container>
@@ -88,6 +144,11 @@ export default {
   data() {
     return {
       loading: false,
+      targetLoading: false,
+      targetResults: [] as any[],
+      targetSource: '',
+      targetFallback: false,
+      targetTested: 0,
       selected: 'all',
       form: {
         clientName: '',
@@ -158,6 +219,13 @@ export default {
       // "All" auto-assigns a distinct port per protocol.
       return this.selected !== 'all'
     },
+    canScanRealityTargets(): boolean {
+      return this.selected === 'all' || this.selected === 'vless-reality'
+    },
+    targetSourceText(): string {
+      const source = ['public', 'cache', 'builtin'].includes(this.targetSource) ? this.targetSource : 'builtin'
+      return i18n.global.t('quickTemplate.targetSource.' + source)
+    },
   },
   methods: {
     reset() {
@@ -168,9 +236,42 @@ export default {
         sni: 'www.apple.com',
       }
       this.loading = false
+      this.targetLoading = false
+      this.targetResults = []
+      this.targetSource = ''
+      this.targetFallback = false
+      this.targetTested = 0
     },
     closeModal() {
       this.$emit('close')
+    },
+    async scanRealityTargets() {
+      this.targetLoading = true
+      this.targetResults = []
+      try {
+        const msg = await HttpUtils.get('api/realityTargets', { batch: Date.now() })
+        if (!msg.success || !msg.obj) {
+          push.error({ message: i18n.global.t('quickTemplate.targetScanFail') + (msg.msg ? ': ' + msg.msg : '') })
+          return
+        }
+        this.targetSource = msg.obj.source || 'builtin'
+        this.targetFallback = !!msg.obj.fallback
+        this.targetTested = Number(msg.obj.tested || 0)
+        this.targetResults = Array.isArray(msg.obj.results) ? msg.obj.results : []
+        if (this.targetResults.length === 0) {
+          push.error({ message: i18n.global.t('quickTemplate.targetNone') })
+          return
+        }
+        this.sniPresets = Array.from(new Set([
+          ...this.targetResults.map((item: any) => item.domain),
+          ...this.sniPresets,
+        ]))
+      } finally {
+        this.targetLoading = false
+      }
+    },
+    selectRealityTarget(domain: string) {
+      this.form.sni = domain
     },
     async create() {
       // Resolve and lock the client name so every step uses the same value.

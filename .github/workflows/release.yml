@@ -57,7 +57,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Run security, core and service tests
-        run: go test ./api ./core ./service
+        run: go test ./api ./core ./service ./network/realitytarget
 
   build-frontend:
     needs: quality-checks

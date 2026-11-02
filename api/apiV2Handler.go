@@ -90,6 +90,8 @@ func (a *APIv2Handler) getHandler(c *gin.Context) {
 		a.ApiService.GetDb(c)
 	case "checkOutbound":
 		a.ApiService.GetCheckOutbound(c)
+	case "realityTargets":
+		a.ApiService.GetRealityTargets(c)
 	default:
 		jsonMsg(c, "failed", common.NewError("unknown action: ", action))
 	}

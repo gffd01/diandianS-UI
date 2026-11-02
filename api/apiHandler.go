@@ -107,6 +107,8 @@ func (a *APIHandler) getHandler(c *gin.Context) {
 		a.ApiService.GetSingboxConfig(c)
 	case "checkOutbound":
 		a.ApiService.GetCheckOutbound(c)
+	case "realityTargets":
+		a.ApiService.GetRealityTargets(c)
 	case "testServer":
 		a.ApiService.TestServer(c)
 	default:
