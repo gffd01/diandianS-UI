@@ -304,7 +304,7 @@ export default {
         },
         client: {
           reality: { enabled: true, public_key: kp.pub, short_id: sid },
-          utls: { enabled: true, fingerprint: 'chrome' },
+          utls: { enabled: true, fingerprint: 'firefox' },
         },
       }
       const tlsId = await this.saveTls(tlsObj)

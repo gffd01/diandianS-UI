@@ -123,7 +123,7 @@ export const defaultOutTls: oTls = {
   cipher_suites: [],
   utls: {
     enabled: true,
-    fingerprint: "chrome",
+    fingerprint: "firefox",
   },
   reality: {
     enabled: true,
