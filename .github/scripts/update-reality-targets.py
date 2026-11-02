@@ -70,6 +70,30 @@ APPROVED_SUFFIXES = (
     "youtube.com",
 )
 
+APPROVED_PUBLIC_PREFIXES = {
+    "addons",
+    "aws",
+    "cdn",
+    "cloud",
+    "developer",
+    "developers",
+    "dl",
+    "docs",
+    "download",
+    "downloads",
+    "edge",
+    "images",
+    "learn",
+    "r",
+    "static",
+    "store",
+    "store-images",
+    "support",
+    "th",
+    "visualstudio",
+    "www",
+}
+
 SEED_DOMAINS = [
     "www.apple.com",
     "addons.mozilla.org",
@@ -170,7 +194,12 @@ def public_addresses(domain: str) -> list[str]:
 
 
 def approved_public_candidate(domain: str) -> bool:
-    return any(domain == suffix or domain.endswith("." + suffix) for suffix in APPROVED_SUFFIXES)
+    for suffix in APPROVED_SUFFIXES:
+        if domain == suffix:
+            return True
+        if domain.endswith("." + suffix):
+            return domain.split(".", 1)[0] in APPROVED_PUBLIC_PREFIXES
+    return False
 
 
 def probe(domain: str) -> str | None:
@@ -216,7 +245,12 @@ def build_feed(source_url: str) -> dict[str, object]:
             if result:
                 passed.append(result)
 
-    domains = sorted(set(passed))[:OUTPUT_LIMIT]
+    passed_set = set(passed)
+    # 维护种子永远优先保留；公网发现结果每日打散，避免某家运营商按字母顺序挤满列表。
+    seed_passed = [domain for domain in SEED_DOMAINS if domain in passed_set]
+    discovered = sorted(passed_set.difference(seed_passed))
+    randomizer.shuffle(discovered)
+    domains = seed_passed + discovered[: max(0, OUTPUT_LIMIT - len(seed_passed))]
     if len(domains) < MINIMUM_OUTPUT:
         raise RuntimeError(
             f"only {len(domains)} candidates passed; keeping the previous public feed"
