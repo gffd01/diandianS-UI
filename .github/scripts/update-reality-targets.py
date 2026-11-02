@@ -27,7 +27,48 @@ MAX_DOWNLOAD_BYTES = 40 * 1024 * 1024
 SOURCE_LIMIT = 10_000
 SAMPLE_SIZE = 1_200
 OUTPUT_LIMIT = 200
-MINIMUM_OUTPUT = 50
+MINIMUM_OUTPUT = 20
+
+# 公网榜单只负责发现这些已知运营商的新子域名，避免把影视、博彩、成人站点
+# 或可由任意用户创建内容的公共托管域名混入面板候选。
+APPROVED_SUFFIXES = (
+    "adobe.com",
+    "amd.com",
+    "amazon.com",
+    "apple.com",
+    "bing.com",
+    "cisco.com",
+    "cloudflare.com",
+    "dell.com",
+    "facebook.com",
+    "google.com",
+    "googleapis.com",
+    "gstatic.com",
+    "hp.com",
+    "ibm.com",
+    "icloud.com",
+    "intel.com",
+    "lenovo.com",
+    "linkedin.com",
+    "live.com",
+    "microsoft.com",
+    "mozilla.org",
+    "netflix.com",
+    "nvidia.com",
+    "office.com",
+    "oracle.com",
+    "paypal.com",
+    "reddit.com",
+    "s-microsoft.com",
+    "samsung.com",
+    "sony.com",
+    "spotify.com",
+    "tiktok.com",
+    "wikipedia.org",
+    "windows.com",
+    "yahoo.com",
+    "youtube.com",
+)
 
 SEED_DOMAINS = [
     "www.apple.com",
@@ -51,6 +92,25 @@ SEED_DOMAINS = [
     "munchkin.marketo.net",
     "consent.trustarc.com",
     "rum.hlx.page",
+    "www.adobe.com",
+    "www.cisco.com",
+    "www.dell.com",
+    "www.facebook.com",
+    "www.google.com",
+    "www.hp.com",
+    "www.ibm.com",
+    "www.instagram.com",
+    "www.lenovo.com",
+    "www.linkedin.com",
+    "www.netflix.com",
+    "www.oracle.com",
+    "www.paypal.com",
+    "www.reddit.com",
+    "www.spotify.com",
+    "www.tiktok.com",
+    "www.wikipedia.org",
+    "www.yahoo.com",
+    "www.youtube.com",
 ]
 
 
@@ -109,6 +169,10 @@ def public_addresses(domain: str) -> list[str]:
     return list(dict.fromkeys(addresses))
 
 
+def approved_public_candidate(domain: str) -> bool:
+    return any(domain == suffix or domain.endswith("." + suffix) for suffix in APPROVED_SUFFIXES)
+
+
 def probe(domain: str) -> str | None:
     try:
         addresses = public_addresses(domain)
@@ -137,7 +201,10 @@ def probe(domain: str) -> str | None:
 
 
 def build_feed(source_url: str) -> dict[str, object]:
-    public_domains = download_candidates(source_url)
+    public_domains = [
+        domain for domain in download_candidates(source_url)
+        if approved_public_candidate(domain)
+    ]
     daily_seed = int(dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d"))
     randomizer = random.Random(daily_seed)
     sample = randomizer.sample(public_domains, min(SAMPLE_SIZE, len(public_domains)))
@@ -157,9 +224,16 @@ def build_feed(source_url: str) -> dict[str, object]:
     return {
         "version": 1,
         "generated_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        "source": "Tranco daily list with subdomains plus maintained seed domains",
+        "source": "Tranco daily list filtered to maintained operator suffixes plus seed domains",
         "source_url": source_url,
-        "criteria": ["public IP", "valid certificate", "TLS 1.3", "HTTP/2", "X25519"],
+        "criteria": [
+            "maintained operator suffix",
+            "public IP",
+            "valid certificate",
+            "TLS 1.3",
+            "HTTP/2",
+            "X25519",
+        ],
         "domains": domains,
     }
 
