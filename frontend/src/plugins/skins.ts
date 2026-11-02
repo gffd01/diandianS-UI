@@ -1,10 +1,8 @@
 /**
- * 6 gradient "skins". Each bundles a background gradient with the matching
- * Vuetify base theme (light/dark) so component colours and contrast stay
- * correct. The gradient + glass CSS lives in styles/skins.css, keyed off the
- * <html data-skin="..."> attribute this module sets.
+ * 面板只保留两套浅色皮肤。背景与玻璃效果定义在 styles/skins.css，
+ * 通过 <html data-skin="..."> 切换。
  */
-export type SkinId = 'aurora' | 'mesh' | 'deepsea' | 'sunrise' | 'cyber' | 'mint'
+export type SkinId = 'mesh' | 'mint'
 
 export interface Skin {
   id: SkinId
@@ -13,19 +11,20 @@ export interface Skin {
 }
 
 export const SKINS: Skin[] = [
-  { id: 'aurora', base: 'dark', swatch: 'linear-gradient(135deg,#302b63,#a855f7)' },
   { id: 'mesh', base: 'light', swatch: 'linear-gradient(135deg,#c2e9fb,#fbc2eb)' },
-  { id: 'deepsea', base: 'dark', swatch: 'linear-gradient(135deg,#0e3a5f,#38bdf8)' },
-  { id: 'sunrise', base: 'light', swatch: 'linear-gradient(135deg,#ffaa96,#b4a0ff)' },
-  { id: 'cyber', base: 'dark', swatch: 'linear-gradient(135deg,#ec4899,#22d3ee)' },
   { id: 'mint', base: 'light', swatch: 'linear-gradient(135deg,#a7f3d0,#bae6fd)' },
 ]
 
-export const DEFAULT_SKIN: SkinId = 'aurora'
+export const DEFAULT_SKIN: SkinId = 'mint'
 
 export function savedSkin(): Skin {
   const id = localStorage.getItem('skin') as SkinId | null
-  return SKINS.find((s) => s.id === id) ?? SKINS[0]
+  const skin = SKINS.find((s) => s.id === id)
+  if (skin) return skin
+
+  // 升级前保存的极光、深海等旧值已不再可用，统一迁移为薄荷青。
+  localStorage.setItem('skin', DEFAULT_SKIN)
+  return SKINS.find((s) => s.id === DEFAULT_SKIN)!
 }
 
 /** Reflect the chosen skin onto <html> so styles/skins.css picks its gradient. */

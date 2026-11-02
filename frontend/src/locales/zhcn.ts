@@ -114,11 +114,7 @@ export default {
   },
   skin: {
     title: "外观",
-    aurora: "极光",
     mesh: "流光网格",
-    deepsea: "深海",
-    sunrise: "晨曦",
-    cyber: "赛博霓虹",
     mint: "薄荷青",
   },
   pages: {

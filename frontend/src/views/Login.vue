@@ -68,8 +68,7 @@ import { SKINS, savedSkin, applySkinAttr, type SkinId } from '@/plugins/skins'
 const theme = useTheme()
 const locale = useLocale()
 
-// Same gradient-skin picker as the in-panel app bar, so the login screen shows
-// the chosen skin (default Aurora) and stays in sync with the rest of the UI.
+// 登录页与面板共用同一个皮肤选择器，默认使用薄荷青。
 const skins = SKINS
 const currentSkin = ref<SkinId>(savedSkin().id)
 

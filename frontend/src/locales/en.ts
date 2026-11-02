@@ -114,11 +114,7 @@ export default {
   },
   skin: {
     title: "Appearance",
-    aurora: "Aurora",
     mesh: "Mesh",
-    deepsea: "Deep Sea",
-    sunrise: "Sunrise",
-    cyber: "Cyber Neon",
     mint: "Mint",
   },
   pages: {
