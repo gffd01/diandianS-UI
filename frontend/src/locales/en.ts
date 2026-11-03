@@ -318,6 +318,8 @@ export default {
     config: "Config",
     links: "Links",
     socks5FourPartHint: "SOCKS5 four-part format: IP:PORT:USERNAME:PASSWORD",
+    httpFourPartHint: "HTTP four-part format: IP:PORT:USERNAME:PASSWORD",
+    httpsFourPartHint: "HTTPS four-part format: IP:PORT:USERNAME:PASSWORD",
     external: "External Link",
     sub: "External Subscription",
     delayStart: "Delay Start",

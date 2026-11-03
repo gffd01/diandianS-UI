@@ -318,6 +318,8 @@ export default {
     config: "配置",
     links: "链接",
     socks5FourPartHint: "SOCKS5 四段式：IP:端口:用户名:密码",
+    httpFourPartHint: "HTTP 四段式：IP:端口:用户名:密码",
+    httpsFourPartHint: "HTTPS 四段式：IP:端口:用户名:密码",
     external: "外部链接",
     sub: "外部订阅",
     delayStart: "延迟启动",

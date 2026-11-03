@@ -164,8 +164,8 @@
                 <v-col cols="auto">{{ index + 1 }}</v-col>
                 <v-col style="direction: ltr; overflow-y: hidden;">
                   {{ displayLink(lnk.uri) }}
-                  <div v-if="isSocks5Link(lnk.uri)" class="text-caption" style="direction: ltr; opacity: 0.68;">
-                    {{ $t('client.socks5FourPartHint') }}
+                  <div v-if="fourPartType(lnk.uri)" class="text-caption" style="direction: ltr; opacity: 0.68;">
+                    {{ $t(`client.${fourPartType(lnk.uri)}FourPartHint`) }}
                   </div>
                 </v-col>
               </v-row>
@@ -231,7 +231,7 @@
 import { createClient, randomConfigs, updateConfigs, Link, shuffleConfigs } from '@/types/clients'
 import DatePick from '@/components/DateTime.vue'
 import { HumanReadable } from '@/plugins/utils'
-import { displayProxyLink, socks5FourPart } from '@/plugins/proxyLink'
+import { displayProxyLink, proxyFourPart } from '@/plugins/proxyLink'
 import Data from '@/store/modules/data'
 import { locale } from '@/locales'
 
@@ -254,8 +254,8 @@ export default {
     displayLink(uri: string): string {
       return displayProxyLink(uri)
     },
-    isSocks5Link(uri: string): boolean {
-      return socks5FourPart(uri) !== null
+    fourPartType(uri: string): string {
+      return proxyFourPart(uri)?.type ?? ''
     },
     async updateData(id: number) {
       if (id > 0) {
