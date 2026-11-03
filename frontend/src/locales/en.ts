@@ -317,6 +317,7 @@ export default {
     basics: "Basics",
     config: "Config",
     links: "Links",
+    socks5FourPartHint: "SOCKS5 four-part format: IP:PORT:USERNAME:PASSWORD",
     external: "External Link",
     sub: "External Subscription",
     delayStart: "Delay Start",

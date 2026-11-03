@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite --host",
-    "build": "node scripts/check-auth-guard.mjs && vue-tsc --noEmit && vite build",
+    "build": "node scripts/check-auth-guard.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-proxy-link.mjs && vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint . --fix --ignore-path .gitignore"
   },
