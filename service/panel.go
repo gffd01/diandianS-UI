@@ -51,7 +51,7 @@ const (
 	// 脚本里只有在 /usr/local/s-ui/db/s-ui.db 不存在时才生成随机账号密码和端口,
 	// 已装过的机器走的是「保留现有设置」那条路 —— 否则 Web 点一下更新就会
 	// 把管理员锁在面板外面。
-	panelReleaseAPI      = "https://api.github.com/repos/gffd01/diandian/releases/latest"
+	panelReleaseAPI      = "https://api.github.com/repos/gffd01/diandianS-UI/releases/latest"
 	localPanelUpdater    = "/usr/local/s-ui/install.sh"
 	maxPanelUpdaterBytes = 2 << 20
 )
@@ -62,7 +62,7 @@ func (s *PanelService) GetUpdateInfo() (*PanelUpdateInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	current := config.GetVersion()
+	current := config.GetRelease()
 	return &PanelUpdateInfo{
 		CurrentVersion:  current,
 		LatestVersion:   latest,
@@ -181,10 +181,15 @@ func fetchLatestPanelVersion() (string, error) {
 	return release.TagName, nil
 }
 
-// 版本形如 1.4.2-qs43(CI 会把 tag 去掉 v 后写进 config/version)。
-// 先比三段主版本号,一样再比 qs 序号 —— 光比字符串的话,本地跑着比线上新的
-// 开发版时会一直亮「有更新」。
+// 独立仓库 Release 使用 universal-N，正式构建会把同一标签写进二进制。
+// 同时保留对上游 1.4.2-qs43 形式的兼容，方便本地开发和历史版本测试。
 func isNewerVersion(latest, current string) bool {
+	if lBuild, lOk := parseUniversalVersion(latest); lOk {
+		if cBuild, cOk := parseUniversalVersion(current); cOk {
+			return lBuild > cBuild
+		}
+		return normalizeVersionTag(latest) != normalizeVersionTag(current)
+	}
 	lMain, lQs, lOk := parseSuiVersion(latest)
 	cMain, cQs, cOk := parseSuiVersion(current)
 	if !lOk || !cOk {
@@ -196,6 +201,15 @@ func isNewerVersion(latest, current string) bool {
 		}
 	}
 	return lQs > cQs
+}
+
+func parseUniversalVersion(version string) (int, bool) {
+	v := normalizeVersionTag(version)
+	if !strings.HasPrefix(v, "universal-") {
+		return 0, false
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(v, "universal-"))
+	return n, err == nil && n > 0
 }
 
 // 返回三段主版本号、qs 序号(没有则 0)、是否解析成功。

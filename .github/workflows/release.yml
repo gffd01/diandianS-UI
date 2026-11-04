@@ -204,6 +204,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # 保留上游 S-UI 版本号，同时把独立仓库的 Release 标签嵌入二进制，
+          # 让面板更新检查能够准确判断当前构建，不再依赖其他仓库。
+          printf 'universal-%s\n' "${{ github.run_number }}" > config/release
           build_tags="with_quic,with_grpc,with_utls,with_acme,with_gvisor,badlinkname,tfogo_checklinkname0,with_tailscale"
           if [[ "${{ matrix.naive }}" == "true" ]]; then
             build_tags="${build_tags},with_naive_outbound,with_musl"

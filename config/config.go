@@ -12,6 +12,9 @@ import (
 //go:embed version
 var version string
 
+//go:embed release
+var release string
+
 //go:embed name
 var name string
 
@@ -26,6 +29,12 @@ const (
 
 func GetVersion() string {
 	return strings.TrimSpace(version)
+}
+
+// GetRelease 返回当前二进制对应的独立仓库 Release 标签。
+// 本地开发构建使用 development，CI 发布时会写入 universal-N。
+func GetRelease() string {
+	return strings.TrimSpace(release)
 }
 
 func GetName() string {

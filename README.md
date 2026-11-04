@@ -7,8 +7,8 @@
 Debian、Ubuntu、CentOS、Rocky Linux、AlmaLinux、Fedora、Arch Linux 和 openSUSE VPS。
 服务器上具体建立什么节点、是否组成多级网络，由使用者在 S-UI 后台配置，安装器不预设线路。
 
-本仓库是 `gffd01/diandian` 中已验证优化版的独立正式仓库，稳定源码位于 `main`。
-原仓库继续保留作为迁移前历史记录，本仓库的安装包和发布流程不再依赖原仓库。
+本仓库是 S-UI 通用安装版的唯一正式仓库，稳定源码位于 `main`。
+源码、安装脚本、版本检查和 Release 下载均只使用 `gffd01/diandianS-UI`。
 
 ## 这一版解决什么
 
