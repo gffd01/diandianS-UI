@@ -17,7 +17,8 @@ Debian、Ubuntu、CentOS、Rocky Linux、AlmaLinux、Fedora、Arch Linux 和 ope
 - 保留升级前的数据库、节点、面板路径和端口，只有后台账号密码会轮换；
 - 自动避开已被其他程序占用的面板端口和订阅端口；
 - 下载 Release、校验 SHA-256 后才解压安装；
-- 默认只开放后台、订阅和明确填写的节点端口；
+- 自动创建主机防火墙：先放行 SSH 端口，再只开放后台、订阅和明确填写的节点端口；
+- 自动安装并启用 fail2ban，SSH 端口 10 分钟内失败 5 次封禁 1 小时；
 - 异常退出自动重启，连接队列按 VPS 内存调整；
 - 内核支持时启用 BBR + fq，并启用 TCP MTU 探测；
 - API Token 默认 30 天有效，重复升级不会堆积同用途的有效令牌；
@@ -28,7 +29,7 @@ Debian、Ubuntu、CentOS、Rocky Linux、AlmaLinux、Fedora、Arch Linux 和 ope
 请用 `root` 用户复制整行执行：
 
 ```bash
-curl --fail --location --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/gffd01/diandianS-UI/08b35bd53f04c577c2605feb8ff21f91196ce9a0/install.sh -o /tmp/s-ui-universal-install.sh && echo '8b51da54c7b5181a3bd2bbbbeb5e5a84add3f9a220d40b18744a656b12f34d37  /tmp/s-ui-universal-install.sh' | sha256sum --check - && chmod 700 /tmp/s-ui-universal-install.sh && SUI_AUTO=1 /tmp/s-ui-universal-install.sh universal-24
+curl --fail --location --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/gffd01/diandianS-UI/f5b18c57f7bd6ac1c32ea5b1a9fb632555ac4bb0/install.sh -o /tmp/s-ui-universal-install.sh && echo 'e4f95f77d96e99f99e67a38fb9bb7d22f69f08335013f7771275da947a0ba448  /tmp/s-ui-universal-install.sh' | sha256sum --check - && chmod 700 /tmp/s-ui-universal-install.sh && SUI_AUTO=1 /tmp/s-ui-universal-install.sh universal-24
 ```
 
 这条命令同时固定了新仓库的安装脚本提交、脚本 SHA-256 和 Release 标签。只有出现
@@ -46,15 +47,25 @@ less install.sh
 
 ## 默认安装结果
 
-默认是 `direct` 模式：后台监听所有网卡，主机防火墙开放实际后台和订阅端口，安装后可以直接
-使用终端打印的地址、随机账号和密码登录。服务商控制台中的安全组不受脚本控制，如外网打不开，
-仍需在服务商控制台放行终端显示的后台端口。
-
-如果只允许通过 SSH 隧道管理后台，使用：
+默认是 `tunnel` 模式：后台只监听 `127.0.0.1`，管理后台必须通过 SSH 隧道访问，登录密码
+不会在公网接口上以明文传输。安装完成后按终端打印的端口建立隧道：
 
 ```bash
-SUI_ACCESS_MODE=tunnel sudo ./install.sh
+ssh -L 2095:127.0.0.1:2095 root@服务器IP
 ```
+
+然后在本机浏览器打开 `http://127.0.0.1:2095`，加上终端打印的面板路径。
+
+需要后台直接监听所有网卡时显式指定（仅建议在受信网络中使用）：
+
+```bash
+SUI_ACCESS_MODE=direct sudo ./install.sh
+```
+
+服务商控制台中的安全组不受脚本控制。订阅端口仍然监听所有网卡，客户端需要它能被访问。
+
+主机防火墙由 `SUI_FIREWALL_SETUP` 控制：`auto`（默认，仅在机器上没有其他对外服务时创建）、
+`install`（强制创建）、`off`（完全不改动）。`SUI_FAIL2BAN=0` 可以跳过 fail2ban。
 
 需要脚本同时开放节点端口时，明确列出实际端口：
 

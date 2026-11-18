@@ -13,18 +13,24 @@ cur_dir=$(pwd)
 # no country, provider, relay or destination role is hard-coded. Every automatic
 # install/upgrade generates a new random admin username and password and verifies
 # those exact credentials against the live login API before reporting success.
-# The default direct mode makes the panel reachable without an SSH tunnel.
-# Set SUI_ACCESS_MODE=tunnel to bind the panel to localhost instead.
+# The default tunnel mode binds the panel to loopback, so the admin login is
+# never served in cleartext on a public interface. Reach it through an SSH
+# tunnel. Set SUI_ACCESS_MODE=direct to listen on all interfaces instead.
 #   sudo ./install.sh             # auto (default)
 #   SUI_AUTO=0 sudo ./install.sh  # interactive
 SUI_AUTO="${SUI_AUTO:-1}"
 SUI_REPO="${SUI_REPO:-gffd01/diandianS-UI}"
-SUI_ACCESS_MODE="${SUI_ACCESS_MODE:-direct}"
+SUI_ACCESS_MODE="${SUI_ACCESS_MODE:-tunnel}"
 SUI_API_TOKEN_DAYS="${SUI_API_TOKEN_DAYS:-30}"
 SUI_NODE_PORTS="${SUI_NODE_PORTS:-}"
 SUI_ENABLE_TUNING="${SUI_ENABLE_TUNING:-1}"
 SUI_RUN_DIAGNOSTICS="${SUI_RUN_DIAGNOSTICS:-1}"
 SUI_SUB_LISTEN="${SUI_SUB_LISTEN:-0.0.0.0}"
+# auto: create a host firewall when none is active (SSH port is allowed first)
+# install: same as auto, kept as an explicit opt-in spelling
+# off: never install or enable a firewall, only configure an existing one
+SUI_FIREWALL_SETUP="${SUI_FIREWALL_SETUP:-auto}"
+SUI_FAIL2BAN="${SUI_FAIL2BAN:-1}"
 install_tmp_dir=""
 INSTALL_ADMIN_USER=""
 INSTALL_ADMIN_PASS=""
@@ -39,11 +45,22 @@ direct)
     ;;
 tunnel)
     SUI_PANEL_LISTEN="${SUI_PANEL_LISTEN:-127.0.0.1}"
-    SUI_OPEN_FIREWALL="${SUI_OPEN_FIREWALL:-0}"
+    # open_firewall skips the panel port when it listens on loopback, so keeping
+    # firewall handling on here only opens the subscription port and the node
+    # ports that were explicitly supplied.
+    SUI_OPEN_FIREWALL="${SUI_OPEN_FIREWALL:-1}"
     SUI_ENABLE_API_TOKEN="${SUI_ENABLE_API_TOKEN:-0}"
     ;;
 *)
     echo -e "${red}Invalid SUI_ACCESS_MODE: ${SUI_ACCESS_MODE}. Use direct or tunnel.${plain}" >&2
+    exit 1
+    ;;
+esac
+
+case "$SUI_FIREWALL_SETUP" in
+auto | install | off) ;;
+*)
+    echo -e "${red}Invalid SUI_FIREWALL_SETUP: ${SUI_FIREWALL_SETUP}. Use auto, install or off.${plain}" >&2
     exit 1
     ;;
 esac
@@ -436,7 +453,7 @@ config_after_install() {
 # firewall so nodes are reachable out of the box. Full-auto only.
 open_firewall() {
     [[ "$SUI_OPEN_FIREWALL" == "1" ]] || {
-        echo -e "${yellow}[secure] Host firewall was not changed. Open only the ports you actually use.${plain}"
+        echo -e "${yellow}[secure] Host firewall was not changed; every listening port stays reachable from the network.${plain}"
         return 0
     }
     local panel_port sub_port
@@ -472,6 +489,134 @@ open_firewall() {
         fi
         firewall-cmd --reload > /dev/null 2>&1
         echo -e "${green}[secure] Firewall opened only for the panel, subscription and explicitly supplied node ports.${plain}"
+    fi
+}
+
+# Read the port sshd is really bound to. Getting this wrong would cut the
+# administrator off the moment the firewall is enabled, so every fallback is
+# conservative and the caller re-checks that the port is actually listening.
+detect_ssh_port() {
+    local port=""
+    if command -v sshd > /dev/null 2>&1; then
+        port=$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}' || true)
+    fi
+    if [[ ! "$port" =~ ^[0-9]{1,5}$ ]] && command -v ss > /dev/null 2>&1; then
+        port=$(ss -tlnp 2>/dev/null | awk '/sshd/ {n = split($4, a, ":"); if (n > 1) {print a[n]; exit}}' || true)
+    fi
+    [[ "$port" =~ ^[0-9]{1,5}$ ]] || port=22
+    printf '%s' "$port"
+}
+
+pkg_install_quiet() {
+    case "${release}" in
+    centos | almalinux | rocky | oracle) yum install -y -q "$@" ;;
+    fedora) dnf install -y -q "$@" ;;
+    arch | manjaro | parch) pacman -Sy --noconfirm "$@" ;;
+    opensuse-tumbleweed) zypper -q install -y "$@" ;;
+    *) DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$@" ;;
+    esac
+}
+
+# open_firewall only edits a firewall that is already active, so a fresh VPS
+# used to keep every port open. This creates the missing state: install ufw,
+# allow the live SSH port first, and only then switch the default policy.
+ensure_firewall() {
+    [[ "$SUI_FIREWALL_SETUP" == "off" ]] && return 0
+    [[ "$SUI_OPEN_FIREWALL" == "1" ]] || return 0
+
+    if command -v ufw > /dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+        return 0
+    fi
+    if command -v firewall-cmd > /dev/null 2>&1 && firewall-cmd --state > /dev/null 2>&1; then
+        return 0
+    fi
+
+    # 'auto' must never break a host that already serves something else. It only
+    # creates a firewall when the reachable listeners are the ones this installer
+    # manages. Use SUI_FIREWALL_SETUP=install to override.
+    if [[ "$SUI_FIREWALL_SETUP" == "auto" ]]; then
+        local allowed_ports ssh_pre p unknown_ports
+        ssh_pre=$(detect_ssh_port)
+        allowed_ports=" ${ssh_pre} "
+        while read -r p; do
+            if [[ -n "$p" ]]; then
+                allowed_ports+="${p} "
+            fi
+        done < <(/usr/local/s-ui/sui setting -show 2>/dev/null | grep -iE "Panel port:|Sub port:" | grep -oE '[0-9]+' | head -2)
+        if [[ -n "$SUI_NODE_PORTS" ]]; then
+            allowed_ports+="${SUI_NODE_PORTS//,/ } "
+        fi
+        unknown_ports=$(ss -tln 2>/dev/null | tail -n +2 \
+            | awk '{print $4}' \
+            | grep -vE '^(127\.0\.0\.1|\[::1\]|::1):' \
+            | sed -E 's/.*[.:]([0-9]+)$/\1/' \
+            | sort -un \
+            | while read -r p; do
+                if [[ "$allowed_ports" != *" ${p} "* ]]; then
+                    echo "$p"
+                fi
+              done | tr '\n' ' ')
+        if [[ -n "${unknown_ports// /}" ]]; then
+            echo -e "${yellow}[secure] Other services listen on port(s) ${unknown_ports}; the firewall was not enabled automatically. Re-run with SUI_FIREWALL_SETUP=install to enable it anyway.${plain}"
+            return 0
+        fi
+    fi
+
+    pkg_install_quiet ufw > /dev/null 2>&1 || true
+    if ! command -v ufw > /dev/null 2>&1; then
+        echo -e "${yellow}[secure] ufw is unavailable on this system; the host firewall was left unchanged.${plain}"
+        return 0
+    fi
+
+    local ssh_port
+    ssh_port=$(detect_ssh_port)
+    if ! ss -tln 2>/dev/null | grep -qE "[:.]${ssh_port}[[:space:]]"; then
+        echo -e "${yellow}[secure] SSH port ${ssh_port} is not listening; the firewall was not enabled.${plain}"
+        return 0
+    fi
+
+    ufw allow "${ssh_port}/tcp" > /dev/null 2>&1 || true
+    # Keep ICMP reachable so path MTU discovery keeps working.
+    ufw allow proto icmp > /dev/null 2>&1 || true
+    ufw default deny incoming > /dev/null 2>&1 || true
+    ufw default allow outgoing > /dev/null 2>&1 || true
+    if ufw --force enable > /dev/null 2>&1; then
+        echo -e "${green}[secure] Host firewall enabled; SSH ${ssh_port}/tcp is the only port open so far.${plain}"
+    else
+        echo -e "${yellow}[secure] ufw could not be enabled; please check the firewall state manually.${plain}"
+    fi
+}
+
+# Brute-force protection for the only permanently open port. Best effort: a
+# failure here must never abort an otherwise finished installation.
+setup_fail2ban() {
+    [[ "$SUI_FAIL2BAN" == "1" ]] || return 0
+
+    if ! command -v fail2ban-client > /dev/null 2>&1; then
+        pkg_install_quiet fail2ban > /dev/null 2>&1 || true
+    fi
+    if ! command -v fail2ban-client > /dev/null 2>&1; then
+        echo -e "${yellow}[secure] fail2ban is unavailable in the configured repositories; SSH protection was skipped.${plain}"
+        return 0
+    fi
+
+    local ssh_port
+    ssh_port=$(detect_ssh_port)
+    mkdir -p /etc/fail2ban/jail.d
+    cat > /etc/fail2ban/jail.d/s-ui-sshd.local <<JAIL
+[sshd]
+enabled  = true
+port     = ${ssh_port}
+maxretry = 5
+findtime = 10m
+bantime  = 1h
+JAIL
+
+    systemctl enable fail2ban > /dev/null 2>&1 || true
+    if systemctl restart fail2ban > /dev/null 2>&1; then
+        echo -e "${green}[secure] fail2ban limits SSH port ${ssh_port} to 5 failed attempts per 10 minutes.${plain}"
+    else
+        echo -e "${yellow}[secure] fail2ban was installed but did not start; check systemctl status fail2ban.${plain}"
     fi
 }
 
@@ -547,7 +692,7 @@ verify_panel_login() {
 
 post_install_diagnostics() {
     [[ "$SUI_RUN_DIAGNOSTICS" == "1" ]] || return 0
-    local congestion qdisc memory load root_free mtu
+    local congestion qdisc memory load root_free mtu fw_state jail_state
     congestion=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo unknown)
     qdisc=$(sysctl -n net.core.default_qdisc 2>/dev/null || echo unknown)
     memory=$(free -h 2>/dev/null | awk '/^Mem:/ {print $3 "/" $2}' || true)
@@ -556,6 +701,15 @@ post_install_diagnostics() {
     mtu=$(ip -o link show 2>/dev/null | awk '$2 != "lo:" {for (i=1;i<=NF;i++) if ($i=="mtu") {print $(i+1); exit}}' || true)
     echo -e "${green}[系统诊断] 服务=运行中 拥塞控制=${congestion} 队列算法=${qdisc} MTU=${mtu:-未知}${plain}"
     echo -e "${green}[系统诊断] 内存=${memory:-未知} 负载=${load:-未知} 根目录剩余空间=${root_free:-未知}${plain}"
+    if command -v ufw > /dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+        fw_state="ufw 已启用"
+    elif command -v firewall-cmd > /dev/null 2>&1 && firewall-cmd --state > /dev/null 2>&1; then
+        fw_state="firewalld 已启用"
+    else
+        fw_state="未启用"
+    fi
+    jail_state=$(systemctl is-active fail2ban 2>/dev/null || echo "未安装")
+    echo -e "${green}[系统诊断] 主机防火墙=${fw_state} fail2ban=${jail_state}${plain}"
     echo -e "${yellow}[网络诊断] 以上结果仅确认服务器已就绪；线路带宽和丢包取决于服务商及网络路径。${plain}"
 }
 
@@ -667,12 +821,14 @@ install_s-ui() {
     install_tmp_dir=""
 
     config_after_install
+    ensure_firewall
     open_firewall
     apply_network_tuning
     prepare_services
 
     systemctl enable s-ui --now
     verify_panel_login
+    setup_fail2ban
     post_install_diagnostics
 
     echo -e "${green}S-UI ${last_version}${plain} 安装完成，当前已启动并正常运行。"
