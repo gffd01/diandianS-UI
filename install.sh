@@ -13,14 +13,15 @@ cur_dir=$(pwd)
 # no country, provider, relay or destination role is hard-coded. Every automatic
 # install/upgrade generates a new random admin username and password and verifies
 # those exact credentials against the live login API before reporting success.
-# The default tunnel mode binds the panel to loopback, so the admin login is
-# never served in cleartext on a public interface. Reach it through an SSH
-# tunnel. Set SUI_ACCESS_MODE=direct to listen on all interfaces instead.
+# The default direct mode serves the panel on all interfaces and opens only that
+# port, so the admin login is reachable right after install. Set
+# SUI_ACCESS_MODE=tunnel to bind the panel to loopback and reach it through an
+# SSH tunnel instead.
 #   sudo ./install.sh             # auto (default)
 #   SUI_AUTO=0 sudo ./install.sh  # interactive
 SUI_AUTO="${SUI_AUTO:-1}"
 SUI_REPO="${SUI_REPO:-gffd01/diandianS-UI}"
-SUI_ACCESS_MODE="${SUI_ACCESS_MODE:-tunnel}"
+SUI_ACCESS_MODE="${SUI_ACCESS_MODE:-direct}"
 SUI_API_TOKEN_DAYS="${SUI_API_TOKEN_DAYS:-30}"
 SUI_NODE_PORTS="${SUI_NODE_PORTS:-}"
 SUI_ENABLE_TUNING="${SUI_ENABLE_TUNING:-1}"
