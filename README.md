@@ -18,7 +18,7 @@ Debian、Ubuntu、CentOS、Rocky Linux、AlmaLinux、Fedora、Arch Linux 和 ope
 - 自动避开已被其他程序占用的面板端口和订阅端口；
 - 下载 Release、校验 SHA-256 后才解压安装；
 - 自动创建主机防火墙：先放行 SSH 端口，再只开放后台、订阅和明确填写的节点端口；
-- 面板里新建节点后，端口由 `sui-firewall-sync.timer` 每分钟自动补放行，不会出现「服务正常但客户端超时」；
+- 面板里新建或修改节点后，端口立刻自动放行（`sui-firewall-sync.path` 监听数据库变更），不会出现「服务正常但客户端超时」；
 - 自动安装并启用 fail2ban，SSH 端口 10 分钟内失败 5 次封禁 1 小时；
 - 异常退出自动重启，连接队列按 VPS 内存调整；
 - 内核支持时启用 BBR + fq，并启用 TCP MTU 探测；
@@ -30,11 +30,11 @@ Debian、Ubuntu、CentOS、Rocky Linux、AlmaLinux、Fedora、Arch Linux 和 ope
 请用 `root` 用户复制整行执行：
 
 ```bash
-curl --fail --location --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/gffd01/diandianS-UI/ab17d92f2a8ba5cd755b2222bab83e00ccbf3a44/install.sh -o /tmp/s-ui-universal-install.sh && echo '0751efb31250638a96d15a0e4aa6e3e391121e6ee014106e58c33720c5afa85a  /tmp/s-ui-universal-install.sh' | sha256sum --check - && chmod 700 /tmp/s-ui-universal-install.sh && SUI_AUTO=1 /tmp/s-ui-universal-install.sh universal-28
+curl --fail --location --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/gffd01/diandianS-UI/b2e13b01/install.sh -o /tmp/s-ui-universal-install.sh && echo 'fd748c414bfee0ea54f928d9cab89fdb94c3da7b1a1d98ca48101498ada75f2e  /tmp/s-ui-universal-install.sh' | sha256sum --check - && chmod 700 /tmp/s-ui-universal-install.sh && SUI_AUTO=1 /tmp/s-ui-universal-install.sh universal-29
 ```
 
 这条命令同时固定了新仓库的安装脚本提交、脚本 SHA-256 和 Release 标签。只有出现
-`/tmp/s-ui-universal-install.sh: OK` 才会继续安装。`universal-28` 的 7 种 Linux 架构均已通过
+`/tmp/s-ui-universal-install.sh: OK` 才会继续安装。`universal-29` 的 7 种 Linux 架构均已通过
 GitHub Actions 构建，发布包包含独立的 `SHA256SUMS`，所有下载只来自
 `gffd01/diandianS-UI`。
 
@@ -74,8 +74,7 @@ ssh -L 2095:127.0.0.1:2095 root@服务器IP
 SUI_NODE_PORTS=443,8443 sudo ./install.sh
 ```
 
-面板里装好之后才新建的节点端口，由 `sui-firewall-sync.timer` 每分钟自动补放行（只限 s-ui 自己的 TCP
-监听端口）；UDP 协议用 `sui-open-port <端口>`。`SUI_FIREWALL_AUTOSYNC=0` 可以关掉自动同步。
+面板里装好之后才新建的节点端口，由 `sui-firewall-sync` 在面板保存后立即放行（只限 s-ui 自己的 TCP 监听端口）；UDP 协议用 `sui-open-port <端口>`。`SUI_FIREWALL_AUTOSYNC=0` 可以关掉自动同步。
 
 完整参数、安全边界和验收方式见 [通用部署说明](SECURE_INSTALL.md)。
 

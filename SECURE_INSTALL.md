@@ -93,8 +93,8 @@ SUI_NODE_PORTS=443,8443 sudo ./install.sh
 节点端口通常是装好之后才在面板里新建的，而防火墙只放行安装那一刻已存在的端口。被防火墙丢掉的
 SYN 不会回 RST，客户端表现为「超时」，看起来像服务没起来，其实服务在正常监听。因此安装器会额外做两件事：
 
-- 装一个 `sui-firewall-sync.timer`，每分钟把 s-ui 进程正在监听的 TCP 端口补进防火墙，只增不删，
-  且只针对 s-ui 自己的监听端口；
+- 装一个 `sui-firewall-sync.path` + `sui-firewall-sync.timer`：面板一保存配置就立刻把 s-ui 进程正在
+  监听的 TCP 端口补进防火墙（定时器每 30 秒兜底），只增不删，且只针对 s-ui 自己的监听端口；
 - 装一个 `sui-open-port <端口>` 命令，用于 UDP 协议（Hysteria/TUIC 等）或临时手动放行：
 
 ```bash
