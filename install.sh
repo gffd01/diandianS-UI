@@ -550,23 +550,27 @@ SUI_OPEN_PORT
 #!/bin/sh
 # Allow every TCP port the s-ui process is listening on. Only adds rules for
 # ports s-ui owns, so it can never expose anything else on the host.
+# The port set is cached, so the frequent timer/path triggers cost one ss call.
 set -u
 command -v ufw > /dev/null 2>&1 || exit 0
 ufw status 2>/dev/null | grep -q "Status: active" || exit 0
 command -v ss > /dev/null 2>&1 || exit 0
-ss -tlnp 2>/dev/null \
+ports=$(ss -tlnp 2>/dev/null \
     | grep -F '("sui"' \
     | awk '{print $4}' \
     | grep -vE '^(127\.0\.0\.1|\[::1\]|::1):' \
     | sed -E 's/.*[.:]([0-9]+)$/\1/' \
-    | sort -un \
-    | while read -r p; do
-        case "$p" in
-        '' | *[!0-9]*) continue ;;
-        esac
-        [ "$p" -ge 1 ] 2>/dev/null || continue
-        ufw allow "${p}/tcp" > /dev/null 2>&1 || true
-    done
+    | sort -un | tr '\n' ' ')
+case "$ports" in
+*[0-9]*) ;;
+*) exit 0 ;;
+esac
+cache=/run/sui-fw-ports
+[ "$ports" = "$(cat "$cache" 2>/dev/null)" ] && exit 0
+for p in $ports; do
+    ufw allow "${p}/tcp" > /dev/null 2>&1 || true
+done
+( printf '%s' "$ports" > "$cache" ) 2>/dev/null || true
 exit 0
 SUI_FW_SYNC
     chmod +x /usr/local/bin/sui-firewall-sync
@@ -581,13 +585,28 @@ Type=oneshot
 ExecStart=/usr/local/bin/sui-firewall-sync
 SUI_UNIT
 
+    # Fires the moment the panel writes a node to the database, so a node is
+    # reachable within a second instead of waiting for the next timer tick.
+    cat > /etc/systemd/system/sui-firewall-sync.path <<'SUI_PATH'
+[Unit]
+Description=Sync the firewall as soon as S-UI changes its database
+
+[Path]
+PathModified=/usr/local/s-ui/db/s-ui.db
+PathModified=/usr/local/s-ui/db/s-ui.db-wal
+Unit=sui-firewall-sync.service
+
+[Install]
+WantedBy=paths.target
+SUI_PATH
+
     cat > /etc/systemd/system/sui-firewall-sync.timer <<'SUI_TIMER'
 [Unit]
 Description=Sync S-UI listening ports into the host firewall
 
 [Timer]
-OnBootSec=30s
-OnUnitActiveSec=1min
+OnBootSec=15s
+OnUnitActiveSec=30s
 AccuracySec=5s
 Unit=sui-firewall-sync.service
 
@@ -597,8 +616,9 @@ SUI_TIMER
 
     systemctl daemon-reload > /dev/null 2>&1 || true
     if systemctl enable --now sui-firewall-sync.timer > /dev/null 2>&1; then
+        systemctl enable --now sui-firewall-sync.path > /dev/null 2>&1 || true
         /usr/local/bin/sui-firewall-sync > /dev/null 2>&1 || true
-        echo -e "${green}[secure] Ports created in the panel are opened automatically; use sui-open-port <port> for anything else.${plain}"
+        echo -e "${green}[secure] Ports created in the panel are opened immediately; use sui-open-port <port> for anything else.${plain}"
     else
         echo -e "${yellow}[secure] Automatic port sync could not be enabled; run sui-open-port <port> after adding a node.${plain}"
     fi
