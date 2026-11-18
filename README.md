@@ -29,11 +29,11 @@ Debian、Ubuntu、CentOS、Rocky Linux、AlmaLinux、Fedora、Arch Linux 和 ope
 请用 `root` 用户复制整行执行：
 
 ```bash
-curl --fail --location --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/gffd01/diandianS-UI/f5b18c57f7bd6ac1c32ea5b1a9fb632555ac4bb0/install.sh -o /tmp/s-ui-universal-install.sh && echo 'e4f95f77d96e99f99e67a38fb9bb7d22f69f08335013f7771275da947a0ba448  /tmp/s-ui-universal-install.sh' | sha256sum --check - && chmod 700 /tmp/s-ui-universal-install.sh && SUI_AUTO=1 /tmp/s-ui-universal-install.sh universal-24
+curl --fail --location --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/gffd01/diandianS-UI/0aa36891e19d99718b2d026fb1de3aa3a20653b8/install.sh -o /tmp/s-ui-universal-install.sh && echo 'e4f95f77d96e99f99e67a38fb9bb7d22f69f08335013f7771275da947a0ba448  /tmp/s-ui-universal-install.sh' | sha256sum --check - && chmod 700 /tmp/s-ui-universal-install.sh && SUI_AUTO=1 /tmp/s-ui-universal-install.sh universal-26
 ```
 
 这条命令同时固定了新仓库的安装脚本提交、脚本 SHA-256 和 Release 标签。只有出现
-`/tmp/s-ui-universal-install.sh: OK` 才会继续安装。`universal-24` 的 7 种 Linux 架构均已通过
+`/tmp/s-ui-universal-install.sh: OK` 才会继续安装。`universal-26` 的 7 种 Linux 架构均已通过
 GitHub Actions 构建，发布包包含独立的 `SHA256SUMS`，所有下载只来自
 `gffd01/diandianS-UI`。
 
