@@ -18,6 +18,7 @@ Debian、Ubuntu、CentOS、Rocky Linux、AlmaLinux、Fedora、Arch Linux 和 ope
 - 自动避开已被其他程序占用的面板端口和订阅端口；
 - 下载 Release、校验 SHA-256 后才解压安装；
 - 自动创建主机防火墙：先放行 SSH 端口，再只开放后台、订阅和明确填写的节点端口；
+- 面板里新建节点后，端口由 `sui-firewall-sync.timer` 每分钟自动补放行，不会出现「服务正常但客户端超时」；
 - 自动安装并启用 fail2ban，SSH 端口 10 分钟内失败 5 次封禁 1 小时；
 - 异常退出自动重启，连接队列按 VPS 内存调整；
 - 内核支持时启用 BBR + fq，并启用 TCP MTU 探测；
@@ -72,6 +73,9 @@ ssh -L 2095:127.0.0.1:2095 root@服务器IP
 ```bash
 SUI_NODE_PORTS=443,8443 sudo ./install.sh
 ```
+
+面板里装好之后才新建的节点端口，由 `sui-firewall-sync.timer` 每分钟自动补放行（只限 s-ui 自己的 TCP
+监听端口）；UDP 协议用 `sui-open-port <端口>`。`SUI_FIREWALL_AUTOSYNC=0` 可以关掉自动同步。
 
 完整参数、安全边界和验收方式见 [通用部署说明](SECURE_INSTALL.md)。
 

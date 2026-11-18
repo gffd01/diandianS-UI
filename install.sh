@@ -32,6 +32,9 @@ SUI_SUB_LISTEN="${SUI_SUB_LISTEN:-0.0.0.0}"
 # off: never install or enable a firewall, only configure an existing one
 SUI_FIREWALL_SETUP="${SUI_FIREWALL_SETUP:-auto}"
 SUI_FAIL2BAN="${SUI_FAIL2BAN:-1}"
+# 1: keep the host firewall in step with the ports s-ui listens on, so a node
+# created in the panel later does not silently time out.
+SUI_FIREWALL_AUTOSYNC="${SUI_FIREWALL_AUTOSYNC:-1}"
 install_tmp_dir=""
 INSTALL_ADMIN_USER=""
 INSTALL_ADMIN_PASS=""
@@ -493,6 +496,114 @@ open_firewall() {
     fi
 }
 
+# open_firewall can only allow the ports that exist at install time. Nodes are
+# normally created afterwards inside the panel, and a blocked node port does not
+# answer with a reset - it silently drops the SYN, so the client reports a
+# timeout long after the server looks perfectly healthy. This installs a tiny
+# sync timer plus a manual helper so that gap cannot happen again.
+install_firewall_helper() {
+    [[ "$SUI_FIREWALL_AUTOSYNC" == "1" ]] || return 0
+    command -v ufw > /dev/null 2>&1 || return 0
+    ufw status 2>/dev/null | grep -q "Status: active" || return 0
+
+    cat > /usr/local/bin/sui-open-port <<'SUI_OPEN_PORT'
+#!/bin/sh
+# Open node ports in the host firewall, both TCP and UDP.
+# usage: sui-open-port 25111 [25112 ...]
+set -u
+if [ "$#" -lt 1 ]; then
+    echo "usage: sui-open-port <port> [port ...]" >&2
+    exit 2
+fi
+rc=0
+for p in "$@"; do
+    case "$p" in
+    '' | *[!0-9]*)
+        echo "skip invalid port: $p" >&2
+        rc=1
+        continue
+        ;;
+    esac
+    if [ "$p" -lt 1 ] || [ "$p" -gt 65535 ]; then
+        echo "skip out-of-range port: $p" >&2
+        rc=1
+        continue
+    fi
+    if command -v ufw > /dev/null 2>&1; then
+        ufw allow "${p}/tcp" > /dev/null 2>&1 || rc=1
+        ufw allow "${p}/udp" > /dev/null 2>&1 || rc=1
+    elif command -v firewall-cmd > /dev/null 2>&1; then
+        firewall-cmd --permanent --add-port="${p}/tcp" > /dev/null 2>&1 || rc=1
+        firewall-cmd --permanent --add-port="${p}/udp" > /dev/null 2>&1 || rc=1
+        firewall-cmd --reload > /dev/null 2>&1 || rc=1
+    else
+        echo "no supported firewall found" >&2
+        exit 1
+    fi
+    echo "opened ${p}/tcp and ${p}/udp"
+done
+exit "$rc"
+SUI_OPEN_PORT
+    chmod +x /usr/local/bin/sui-open-port
+
+    cat > /usr/local/bin/sui-firewall-sync <<'SUI_FW_SYNC'
+#!/bin/sh
+# Allow every TCP port the s-ui process is listening on. Only adds rules for
+# ports s-ui owns, so it can never expose anything else on the host.
+set -u
+command -v ufw > /dev/null 2>&1 || exit 0
+ufw status 2>/dev/null | grep -q "Status: active" || exit 0
+command -v ss > /dev/null 2>&1 || exit 0
+ss -tlnp 2>/dev/null \
+    | grep -F '("sui"' \
+    | awk '{print $4}' \
+    | grep -vE '^(127\.0\.0\.1|\[::1\]|::1):' \
+    | sed -E 's/.*[.:]([0-9]+)$/\1/' \
+    | sort -un \
+    | while read -r p; do
+        case "$p" in
+        '' | *[!0-9]*) continue ;;
+        esac
+        [ "$p" -ge 1 ] 2>/dev/null || continue
+        ufw allow "${p}/tcp" > /dev/null 2>&1 || true
+    done
+exit 0
+SUI_FW_SYNC
+    chmod +x /usr/local/bin/sui-firewall-sync
+
+    cat > /etc/systemd/system/sui-firewall-sync.service <<'SUI_UNIT'
+[Unit]
+Description=Open the TCP ports that S-UI listens on in the host firewall
+After=s-ui.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sui-firewall-sync
+SUI_UNIT
+
+    cat > /etc/systemd/system/sui-firewall-sync.timer <<'SUI_TIMER'
+[Unit]
+Description=Sync S-UI listening ports into the host firewall
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=1min
+AccuracySec=5s
+Unit=sui-firewall-sync.service
+
+[Install]
+WantedBy=timers.target
+SUI_TIMER
+
+    systemctl daemon-reload > /dev/null 2>&1 || true
+    if systemctl enable --now sui-firewall-sync.timer > /dev/null 2>&1; then
+        /usr/local/bin/sui-firewall-sync > /dev/null 2>&1 || true
+        echo -e "${green}[secure] Ports created in the panel are opened automatically; use sui-open-port <port> for anything else.${plain}"
+    else
+        echo -e "${yellow}[secure] Automatic port sync could not be enabled; run sui-open-port <port> after adding a node.${plain}"
+    fi
+}
+
 # Read the port sshd is really bound to. Getting this wrong would cut the
 # administrator off the moment the firewall is enabled, so every fallback is
 # conservative and the caller re-checks that the port is actually listening.
@@ -828,6 +939,7 @@ install_s-ui() {
     prepare_services
 
     systemctl enable s-ui --now
+    install_firewall_helper
     verify_panel_login
     setup_fail2ban
     post_install_diagnostics
@@ -836,6 +948,7 @@ install_s-ui() {
     echo -e "你可以通过以下地址访问面板：${green}"
     /usr/local/s-ui/sui uri
     echo -e "${plain}"
+    echo -e "面板里新建节点后，端口会在 1 分钟内自动放行；换成 UDP 协议或改了端口，执行 ${green}sui-open-port <端口>${plain} 即可。"
     echo -e ""
     s-ui help
 }
